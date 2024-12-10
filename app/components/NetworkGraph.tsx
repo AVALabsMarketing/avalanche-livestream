@@ -147,7 +147,7 @@ const Scene = forwardRef<{ triggerCrossChainAnimation: (from: string, to: string
   }, [nodePositions, currentTime])
 
   useFrame((_, delta) => {
-    setRotationY(prev => prev + 0.001)
+    setRotationY(prev => prev + 0.0005)
     setCurrentTime(prev => prev + delta)
 
     setAnimationStates(prev => 

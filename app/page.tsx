@@ -1,19 +1,17 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { NetworkGraph } from './components/NetworkGraph'
 import { StreamingBox } from './components/StreamingBox'
 import { NetworkStats } from './components/NetworkStats'
-import { fetchNetworkData, fetchLatestTransactions, fetchLatestBlocks, Transaction, Block, NetworkData } from '../utils/api'
+import { fetchNetworkData, NetworkData } from '../utils/api'
 
 interface NetworkGraphRef {
   triggerCrossChainAnimation: (from: string, to: string) => void;
 }
 
 export default function AvalancheVisualization() {
-  const [networkData, setNetworkData] = useState<NetworkData>({ nodes: [], links: [] })
-  const [transactionData, setTransactionData] = useState<Transaction[]>([])
-  const [blockData, setBlockData] = useState<Block[]>([])
+  const [networkData, setNetworkData] = React.useState<NetworkData>({ nodes: [], links: [] })
   const networkRef = useRef<NetworkGraphRef>(null)
 
   useEffect(() => {
@@ -22,27 +20,6 @@ export default function AvalancheVisualization() {
       setNetworkData(data)
     }
     fetchData()
-
-    const fetchTransactions = async () => {
-      const transactions = await fetchLatestTransactions()
-      setTransactionData((prev) => {
-        const newData = [...transactions, ...prev]
-        return newData.slice(0, 5)
-      })
-    }
-
-    const fetchBlocks = async () => {
-      const blocks = await fetchLatestBlocks()
-      setBlockData((prev) => {
-        const newData = [...blocks, ...prev]
-        return newData.slice(0, 5)
-      })
-    }
-
-    const dataInterval = setInterval(() => {
-      fetchTransactions()
-      fetchBlocks()
-    }, 100) // Update every 100ms for a fast stream
 
     const animationInterval = setInterval(() => {
       if (networkRef.current) {
@@ -60,7 +37,6 @@ export default function AvalancheVisualization() {
     }, 2000) // Trigger animations every 2 seconds
 
     return () => {
-      clearInterval(dataInterval)
       clearInterval(animationInterval)
     }
   }, [])
@@ -69,10 +45,10 @@ export default function AvalancheVisualization() {
     <div className="fixed inset-0 grid grid-cols-[350px_1fr_350px] bg-black text-white">
       <div className="p-4 overflow-hidden flex flex-col">
         <div className="flex-1 mb-4">
-          <StreamingBox title="Recent Blocks" data={blockData} type="block" />
+          <StreamingBox title="Recent Blocks" type="block" />
         </div>
         <div className="flex-1">
-          <StreamingBox title="Recent Transactions" data={transactionData} type="transaction" />
+          <StreamingBox title="Recent Transactions" type="transaction" />
         </div>
       </div>
       
@@ -88,3 +64,4 @@ export default function AvalancheVisualization() {
     </div>
   )
 }
+

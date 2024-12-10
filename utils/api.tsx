@@ -15,6 +15,7 @@ export interface Block {
   height: number
   chainID: string
   txCount: number
+  value: string // Added value property to match with StreamingBox component
 }
 
 export interface NetworkData {
@@ -22,10 +23,27 @@ export interface NetworkData {
   links: Array<{ source: string; target: string }>;
 }
 
+export interface ChainData {
+  chainLogoUri: string
+  chainName: string
+  nativeToken: {
+    symbol: string
+    name: string
+    decimals: number
+  }
+}
+
 export async function fetchLatestTransactions(): Promise<Transaction[]> {
   try {
-    const response = await axios.get('/api/latest-transactions')
-    return response.data
+    const response = await axios.get('https://api.routescan.io/v2/network/mainnet/evm/all/transactions?sort=desc&ecosystem=avalanche')
+    return response.data.items.map((item: any) => ({
+      hash: item.id,
+      timestamp: new Date(item.timestamp).getTime(),
+      from: item.from,
+      to: item.to,
+      value: item.value,
+      chainID: item.chainId
+    }))
   } catch (error) {
     console.error('Error fetching latest transactions:', error)
     return []
@@ -34,11 +52,37 @@ export async function fetchLatestTransactions(): Promise<Transaction[]> {
 
 export async function fetchLatestBlocks(): Promise<Block[]> {
   try {
-    const response = await axios.get('/api/latest-blocks')
-    return response.data
+    const response = await axios.get('https://api.routescan.io/v2/network/mainnet/evm/all/blocks?sort=desc&ecosystem=avalanche')
+    return response.data.items.map((item: any) => ({
+      hash: item.id,
+      timestamp: new Date(item.timestamp).getTime(),
+      height: item.number,
+      chainID: item.chainId,
+      txCount: item.txCount,
+      value: item.burnedFees
+    }))
   } catch (error) {
     console.error('Error fetching latest blocks:', error)
     return []
+  }
+}
+
+export async function fetchChainData(chainID: string): Promise<ChainData | null> {
+  try {
+    const response = await axios.get(`https://glacier-api.avax.network/v1/chains/${chainID}`)
+    const data = response.data
+    return {
+      chainLogoUri: data.chainLogoUri,
+      chainName: data.chainName,
+      nativeToken: {
+        symbol: data.networkToken.symbol,
+        name: data.networkToken.name,
+        decimals: data.networkToken.decimals,
+      }
+    }
+  } catch (error) {
+    console.error(`Error fetching chain data for chainID ${chainID}:`, error)
+    return null
   }
 }
 
@@ -75,3 +119,4 @@ export async function fetchNetworkData(): Promise<NetworkData> {
 
   return { nodes, links };
 }
+
