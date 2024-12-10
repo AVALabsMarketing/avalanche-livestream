@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Image from 'next/image'
 import { fetchLatestTransactions, fetchLatestBlocks, fetchChainData, Transaction, Block, ChainData } from '@/utils/api'
+import { formatUnits } from 'viem'
 
 interface StreamingBoxProps {
   title: string
@@ -12,6 +13,7 @@ interface StreamingBoxProps {
 export const StreamingBox: React.FC<StreamingBoxProps> = ({ title, type }) => {
   const [items, setItems] = useState<(Transaction | Block)[]>([])
   const [chainData, setChainData] = useState<{ [chainID: string]: ChainData }>({})
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -49,10 +51,27 @@ export const StreamingBox: React.FC<StreamingBoxProps> = ({ title, type }) => {
     }
 
     fetchItems()
-    const interval = setInterval(fetchItems, type === 'block' ? 1000 : 100)
+    const interval = setInterval(fetchItems, type === 'block' ? 1000 : 500)
 
     return () => clearInterval(interval)
   }, [type, chainData])
+
+  useEffect(() => {
+    if (containerRef.current) {
+      const children = containerRef.current.children
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i] as HTMLElement
+        child.style.transition = 'opacity 0.5s ease, transform 0.5s ease'
+        child.style.opacity = '0'
+        child.style.transform = 'translateY(-10px)'
+        
+        setTimeout(() => {
+          child.style.opacity = '1'
+          child.style.transform = 'translateY(0)'
+        }, i * 100) // Stagger the animations
+      }
+    }
+  }, [items])
 
   const formatHash = (hash: string) => {
     return `${hash.slice(0, 6)}...${hash.slice(-6)}`
@@ -68,19 +87,29 @@ export const StreamingBox: React.FC<StreamingBoxProps> = ({ title, type }) => {
   }
 
   const formatValue = (value: string) => {
-    const num = parseFloat(value)
-    if (isNaN(num)) return '0'
-    if (num === 0) return '0'
-    if (num < 0.00001) return '<0.00001'
-    return num.toFixed(5)
+    const formattedValue = formatUnits(BigInt(value), 18)
+    const [integerPart, fractionalPart] = formattedValue.split('.')
+    
+    if (integerPart.length > 8) {
+      return `${integerPart.slice(0, 8)}...`
+    }
+    
+    const truncatedFractionalPart = fractionalPart ? fractionalPart.slice(0, 4) : ''
+    return `${integerPart}${truncatedFractionalPart ? '.' + truncatedFractionalPart : ''}`
   }
 
-  const renderBlock = (block: Block) => {
+  const renderBlock = (block: Block, index: number) => {
     const currentChainData = chainData[block.chainID]
     return (
       <div 
         key={block.hash}
-        className="flex items-center justify-between p-2 hover:bg-[rgba(232,65,66,0.2)] rounded-lg transition-colors animate-fadeInDown"
+        className="flex items-center justify-between p-2 hover:bg-[rgba(232,65,66,0.2)] rounded-lg transition-colors"
+        style={{
+          opacity: 0,
+          transform: 'translateY(-10px)',
+          transition: 'opacity 0.5s ease, transform 0.5s ease',
+          transitionDelay: `${index * 100}ms`
+        }}
       >
         <div className="flex items-center gap-2">
           <Image 
@@ -114,12 +143,18 @@ export const StreamingBox: React.FC<StreamingBoxProps> = ({ title, type }) => {
     )
   }
 
-  const renderTransaction = (tx: Transaction) => {
+  const renderTransaction = (tx: Transaction, index: number) => {
     const currentChainData = chainData[tx.chainID]
     return (
       <div 
         key={tx.hash}
-        className="flex items-center justify-between p-2 hover:bg-[rgba(232,65,66,0.2)] rounded-lg transition-colors animate-fadeInDown"
+        className="flex items-center justify-between p-2 hover:bg-[rgba(232,65,66,0.2)] rounded-lg transition-colors"
+        style={{
+          opacity: 0,
+          transform: 'translateY(-10px)',
+          transition: 'opacity 0.5s ease, transform 0.5s ease',
+          transitionDelay: `${index * 100}ms`
+        }}
       >
         <div className="flex items-center gap-2">
           <Image 
@@ -142,9 +177,9 @@ export const StreamingBox: React.FC<StreamingBoxProps> = ({ title, type }) => {
           </div>
         </div>
         <div className="flex flex-col items-end">
-          <div className="px-2 py-1 bg-[rgba(232,65,66,0.2)] rounded text-[rgba(232,65,66,0.8)] text-[10px]">
-            {formatValue(tx.value)} {currentChainData ? currentChainData.nativeToken.symbol : 'UNKNOWN'}
-          </div>
+            <div className={`inline-block px-2 py-1 bg-[rgba(232,65,66,0.2)] rounded text-[rgba(232,65,66,0.8)] text-[10px] text-right whitespace-nowrap overflow-hidden text-ellipsis`}>
+            {formatValue(tx.value)} {currentChainData ? currentChainData.nativeToken.symbol : ''}
+            </div>
           <div className="text-[rgba(255,255,255,0.7)] text-xs mt-1">
             {formatTimestamp(tx.timestamp)}
           </div>
@@ -159,11 +194,11 @@ export const StreamingBox: React.FC<StreamingBoxProps> = ({ title, type }) => {
         <h2 className="text-lg font-semibold text-white">{title}</h2>
       </div>
       <div className="flex-grow overflow-hidden">
-        <div className="h-full flex flex-col-reverse space-y-reverse space-y-1 p-2">
-          {items.map((item) => 
+        <div ref={containerRef} className="h-full flex flex-col-reverse space-y-reverse space-y-1 p-2">
+          {items.map((item, index) => 
             type === 'block' 
-              ? renderBlock(item as Block)
-              : renderTransaction(item as Transaction)
+              ? renderBlock(item as Block, index)
+              : renderTransaction(item as Transaction, index)
           )}
         </div>
       </div>

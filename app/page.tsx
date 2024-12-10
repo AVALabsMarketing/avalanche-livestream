@@ -54,7 +54,7 @@ export default function AvalancheVisualization() {
       
       <div className="relative">
         <div className="absolute inset-0">
-          <NetworkGraph ref={networkRef} data={networkData} />
+          <NetworkGraph ref={networkRef} />
         </div>
       </div>
       
