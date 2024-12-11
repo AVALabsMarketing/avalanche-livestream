@@ -17,11 +17,11 @@ interface Chain {
 
 const SPHERE_RADIUS = 2.5;
 const NODE_RADIUS = 2.5;
-const CONNECTIONS_PER_NODE = 3;
+const CONNECTIONS_PER_NODE = 6;
 
 const Globe = () => (
   <Sphere args={[SPHERE_RADIUS, 32, 32]}>
-    <meshBasicMaterial color="#E84142" wireframe opacity={0.15} transparent />
+    <meshBasicMaterial color="#E84142" wireframe opacity={0.1} transparent />
   </Sphere>
 )
 
@@ -90,14 +90,14 @@ const Links = ({ chains }: { chains: Chain[] }) => {
     })
 
     // Connect each node to its closest neighbors
-    // nodePositions.forEach((node, index) => {
-    //   const closestNeighbors = findClosestNeighbors(node, nodePositions, CONNECTIONS_PER_NODE)
-    //   closestNeighbors.forEach(neighbor => {
-    //     if (index < nodePositions.indexOf(neighbor)) {
-    //       result.push([node.position, neighbor.position])
-    //     }
-    //   })
-    // })
+    nodePositions.forEach((node, index) => {
+      const closestNeighbors = findClosestNeighbors(node, nodePositions, CONNECTIONS_PER_NODE)
+      closestNeighbors.forEach(neighbor => {
+        if (index < nodePositions.indexOf(neighbor)) {
+          result.push([node.position, neighbor.position])
+        }
+      })
+    })
 
     return result
   }, [nodePositions])
@@ -110,7 +110,7 @@ const Links = ({ chains }: { chains: Chain[] }) => {
           points={link}
           color="#E84142"
           lineWidth={1}
-          opacity={0.25}
+          opacity={0.15}
           transparent
         />
       ))}
@@ -145,7 +145,7 @@ const NeonBall = ({ animationState, currentTime }: { animationState: AnimationSt
       <mesh position={position}>
         <sphereGeometry args={[0.03, 16, 16]} />
         <meshBasicMaterial color="#00FFFF" />
-        <pointLight color="#00FFFF" intensity={2} distance={0.15} />
+        <pointLight color="#00FFFF" intensity={2} distance={0.1} />
       </mesh>
       {trailPositions.map((pos, index) => (
         <mesh key={index} position={pos}>
@@ -216,7 +216,7 @@ const Scene = forwardRef<{ triggerCrossChainAnimation: (from: string, to: string
 
   return (
     <group ref={groupRef}>
-      <Globe />
+      {/* <Globe /> */}
       <Nodes chains={chains} />
       <Links chains={chains} />
       {animationStates.map(state => (
