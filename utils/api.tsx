@@ -35,12 +35,12 @@ export interface ChainData {
 
 export async function fetchLatestTransactions(): Promise<Transaction[]> {
   try {
-    const response = await axios.get('https://api.routescan.io/v2/network/mainnet/evm/all/transactions?sort=desc&ecosystem=avalanche')
-    return response.data.items.map((item: any) => ({
-      hash: item.id,
-      timestamp: new Date(item.timestamp).getTime(),
-      from: item.from,
-      to: item.to,
+    const response = await axios.get('https://glacier-api.avax.network/v1/transactions')
+    return response.data.transactions.map((item: any) => ({
+      hash: item.txHash,
+      timestamp: item.blockTimestamp * 1000, // Convert to milliseconds
+      from: item.from.address,
+      to: item.to.address,
       value: item.value,
       chainID: item.chainId
     }))
@@ -51,19 +51,19 @@ export async function fetchLatestTransactions(): Promise<Transaction[]> {
 }
 
 export async function fetchLatestBlocks(): Promise<Block[]> {
-  try {
-    const response = await axios.get('https://api.routescan.io/v2/network/mainnet/evm/all/blocks?sort=desc&ecosystem=avalanche')
-    return response.data.items.map((item: any) => ({
-      hash: item.id,
-      timestamp: new Date(item.timestamp).getTime(),
-      height: item.number,
+  try {  
+    const response = await axios.get('https://glacier-api.avax.network/v1/blocks');
+    return response.data.blocks.map((item: any) => ({
+      hash: item.blockHash,
+      timestamp: item.blockTimestamp * 1000, // Convert to milliseconds
+      height: parseInt(item.blockNumber),
       chainID: item.chainId,
       txCount: item.txCount,
-      value: item.burnedFees
-    }))
+      value: item.feesSpent // Using feesSpent instead of burnedFees
+    }));
   } catch (error) {
-    console.error('Error fetching latest blocks:', error)
-    return []
+    console.error('Error fetching latest blocks:', error);
+    return [];
   }
 }
 

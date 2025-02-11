@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef } from 'react'
 import { NetworkGraph } from './components/NetworkGraph'
-import { StreamingBox } from './components/StreamingBox'
+import { TransactionStream } from './components/TransactionStream'
+import { BlockStream } from './components/BlockStream'
 import { NetworkStats } from './components/NetworkStats'
 import { fetchNetworkData, NetworkData } from '../utils/api'
 
@@ -42,24 +43,30 @@ export default function AvalancheVisualization() {
   }, [])
 
   return (
-    <div className="fixed inset-0 grid grid-cols-[350px_1fr_350px] bg-black text-white">
-      <div className="p-4 overflow-hidden flex flex-col">
-        <div className="flex-1 mb-4">
-          <StreamingBox title="Recent Blocks" type="block" />
-        </div>
-        <div className="flex-1">
-          <StreamingBox title="Recent Transactions" type="transaction" />
-        </div>
-      </div>
-      
-      <div className="relative">
-        <div className="absolute inset-0">
-          <NetworkGraph ref={networkRef} />
-        </div>
-      </div>
-      
-      <div className="p-4">
+    <div className="fixed inset-0 flex flex-col bg-black text-white">
+      {/* Stats Bar on Top */}
+      <div className="h-[100px] px-4 py-2">
         <NetworkStats />
+      </div>
+      
+      {/* Main Content */}
+      <div className="flex-1 grid grid-cols-[350px_1fr_350px]">
+        {/* Left Side - Transactions */}
+        <div className="p-4 overflow-hidden">
+          <TransactionStream />
+        </div>
+        
+        {/* Center - Network Graph */}
+        <div className="relative">
+          <div className="absolute inset-0">
+            <NetworkGraph ref={networkRef} />
+          </div>
+        </div>
+        
+        {/* Right Side - Blocks */}
+        <div className="p-4 overflow-hidden">
+          <BlockStream />
+        </div>
       </div>
     </div>
   )

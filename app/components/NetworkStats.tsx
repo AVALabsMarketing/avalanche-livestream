@@ -10,6 +10,8 @@ interface NetworkStatsData {
   marketCap: number
   transactions: number
   burnedFees: number
+  l1Count: number
+  subnetCount: number
 }
 
 export const NetworkStats = () => {
@@ -18,7 +20,9 @@ export const NetworkStats = () => {
     priceChange: 0,
     marketCap: 0,
     transactions: 0,
-    burnedFees: 0
+    burnedFees: 0,
+    l1Count: 0,
+    subnetCount: 0
   })
   const [priceDirection, setPriceDirection] = useState<'up' | 'down' | null>(null)
   const prevPrice = useRef(0)
@@ -46,13 +50,36 @@ export const NetworkStats = () => {
         // Calculate price change
         const priceChange = ((avaxUsdRate - prevPrice.current) / prevPrice.current) * 100
         
-        setStats({
+        
+        const glacierResponse = await axios.get(
+          `https://glacier-api.avax.network/v1/networks/mainnet/subnets`
+        )
+        
+        let allSubnets = [...glacierResponse.data.subnets]
+        let nextPageToken = glacierResponse.data.nextPageToken
+
+        // Fetch additional pages while nextPageToken exists
+        while (nextPageToken) {
+          const nextPage = await axios.get(
+            `https://glacier-api.avax.network/v1/networks/mainnet/subnets?pageToken=${nextPageToken}`
+          )
+          allSubnets = [...allSubnets, ...nextPage.data.subnets]
+          nextPageToken = nextPage.data.nextPageToken
+        }
+
+        const l1Count = allSubnets.filter((subnet: any) => subnet.isL1).length
+        const subnetCount = allSubnets.length
+
+        setStats(prevStats => ({
+          ...prevStats,
           price: avaxUsdRate,
           priceChange: priceChange,
           marketCap: marketCap,
           transactions: transactions,
-          burnedFees: burnedFees
-        })
+          burnedFees: burnedFees,
+          l1Count: l1Count,
+          subnetCount: subnetCount
+        }))
         
         // Set price direction for animation
         if (avaxUsdRate > prevPrice.current) {
@@ -76,34 +103,18 @@ export const NetworkStats = () => {
   }, [])
 
   return (
-    <div className="h-full flex flex-col justify-center items-end p-4 space-y-4 overflow-y-auto">
-      <div className="bg-[rgba(232,65,66,0.1)] rounded-xl p-4 border border-[rgba(232,65,66,0.2)] w-full max-w-[300px]">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-400">AVAX</span>
-          <span className={`text-2xl font-bold transition-all duration-300 ${
-            priceDirection === 'up' ? 'text-green-500 transform translate-y-[-4px]' :
-            priceDirection === 'down' ? 'text-red-500 transform translate-y-[4px]' :
-            ''
-          }`}>
-            ${stats.price.toFixed(2)}
-          </span>
-          <span className={`flex items-center ${stats.priceChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {stats.priceChange >= 0 ? <TrendingUp size={16} className="mr-1" /> : <TrendingDown size={16} className="mr-1" />}
-            {Math.abs(stats.priceChange).toFixed(2)}%
-          </span>
-        </div>
+    <div className="h-full flex justify-center items-center gap-4 p-2">
+      <div className="bg-[rgba(232,65,66,0.1)] rounded-xl p-3 border border-[rgba(232,65,66,0.2)] flex flex-col items-center justify-center">
+        <span className="text-sm text-gray-400">Market Cap (AVAX)</span>
+        <span className="text-lg font-bold">${stats.marketCap.toFixed(2)}B</span>
       </div>
-      <div className="bg-[rgba(232,65,66,0.1)] rounded-xl p-4 border border-[rgba(232,65,66,0.2)] w-full max-w-[300px] flex flex-col items-center justify-center">
-        <span className="text-sm text-gray-400 mb-2">Market Cap (AVAX)</span>
-        <span className="text-xl font-bold">${stats.marketCap.toFixed(2)}B</span>
+      <div className="bg-[rgba(232,65,66,0.1)] rounded-xl p-3 border border-[rgba(232,65,66,0.2)] flex flex-col items-center justify-center">
+        <span className="text-sm text-gray-400">Total Transactions</span>
+        <span className="text-lg font-bold">{stats.transactions.toFixed(2)}B</span>
       </div>
-      <div className="bg-[rgba(232,65,66,0.1)] rounded-xl p-4 border border-[rgba(232,65,66,0.2)] w-full max-w-[300px] flex flex-col items-center justify-center">
-        <span className="text-sm text-gray-400 mb-2">Total Transactions (ALL)</span>
-        <span className="text-xl font-bold">{stats.transactions.toFixed(2)}B</span>
-      </div>
-      <div className="bg-[rgba(232,65,66,0.1)] rounded-xl p-4 border border-[rgba(232,65,66,0.2)] w-full max-w-[300px] flex flex-col items-center justify-center">
-        <span className="text-sm text-gray-400 mb-2">Burned Fees (AVAX)</span>
-        <span className="text-xl font-bold">{stats.burnedFees.toFixed(2)}M AVAX</span>
+      <div className="bg-[rgba(232,65,66,0.1)] rounded-xl p-3 border border-[rgba(232,65,66,0.2)] flex flex-col items-center justify-center">
+        <span className="text-sm text-gray-400">Subnets / L1s</span>
+        <span className="text-lg font-bold">{stats.subnetCount} / {stats.l1Count}</span>
       </div>
     </div>
   )

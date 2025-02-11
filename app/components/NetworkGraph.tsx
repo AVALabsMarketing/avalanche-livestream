@@ -257,6 +257,8 @@ export const NetworkGraph = forwardRef<{ triggerCrossChainAnimation: (from: stri
     const fetchChains = async () => {
       try {
         const response = await axios.get('https://glacier-api.avax.network/v1/chains')
+        // Filter out testnet chains
+        // const mainnetChains = response.data.chains.filter((chain: any) => !chain.isTestnet)
         setChains(response.data.chains)
         setIsLoading(false)
       } catch (error) {
