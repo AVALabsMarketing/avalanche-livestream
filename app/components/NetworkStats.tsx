@@ -7,7 +7,6 @@ import axios from 'axios'
 interface NetworkStatsData {
   price: number
   priceChange: number
-  marketCap: number
   transactions: number
   burnedFees: number
   l1Count: number
@@ -18,7 +17,6 @@ export const NetworkStats = () => {
   const [stats, setStats] = useState<NetworkStatsData>({
     price: 0,
     priceChange: 0,
-    marketCap: 0,
     transactions: 0,
     burnedFees: 0,
     l1Count: 0,
@@ -30,13 +28,9 @@ export const NetworkStats = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch AVAX price and market cap from Coinbase API
+        // Fetch AVAX price from Coinbase API
         const coinbaseResponse = await axios.get('https://api.coinbase.com/v2/exchange-rates?currency=AVAX')
         const avaxUsdRate = parseFloat(coinbaseResponse.data.data.rates.USD)
-        
-        // Fetch AVAX market cap from CoinGecko API
-        const coingeckoResponse = await axios.get('https://api.coingecko.com/api/v3/coins/avalanche-2')
-        const marketCap = coingeckoResponse.data.market_data.market_cap.usd / 1e9 // Convert to billions
         
         // Fetch transaction count from Avalanche Explorer API
         const explorerResponse = await axios.get('https://api.snowtrace.io/api?module=proxy&action=eth_blockNumber&apikey=YourApiKeyToken')
@@ -74,7 +68,6 @@ export const NetworkStats = () => {
           ...prevStats,
           price: avaxUsdRate,
           priceChange: priceChange,
-          marketCap: marketCap,
           transactions: transactions,
           burnedFees: burnedFees,
           l1Count: l1Count,
@@ -104,10 +97,6 @@ export const NetworkStats = () => {
 
   return (
     <div className="h-full flex justify-center items-center gap-4 p-2">
-      <div className="bg-[rgba(232,65,66,0.1)] rounded-xl p-3 border border-[rgba(232,65,66,0.2)] flex flex-col items-center justify-center">
-        <span className="text-sm text-gray-400">Market Cap (AVAX)</span>
-        <span className="text-lg font-bold">${stats.marketCap.toFixed(2)}B</span>
-      </div>
       <div className="bg-[rgba(232,65,66,0.1)] rounded-xl p-3 border border-[rgba(232,65,66,0.2)] flex flex-col items-center justify-center">
         <span className="text-sm text-gray-400">Total Transactions</span>
         <span className="text-lg font-bold">{stats.transactions.toFixed(2)}B</span>

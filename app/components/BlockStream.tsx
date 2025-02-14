@@ -12,7 +12,9 @@ export const BlockStream = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const processingQueue = useRef<Block[]>([])
   const isProcessing = useRef(false)
-  const lastProcessedHash = useRef<string | null>(null)
+  const blockCache = useRef<Set<string>>(new Set())
+  const animationFrame = useRef<number>()
+  const lastFetchTime = useRef<number>(0)
 
   const processNextBlock = useCallback(() => {
     if (processingQueue.current.length === 0) {
@@ -23,95 +25,77 @@ export const BlockStream = () => {
     isProcessing.current = true
     const nextBlock = processingQueue.current.shift()!
     
-    // Skip if we've already processed this block
-    if (lastProcessedHash.current === nextBlock.hash) {
-      setTimeout(processNextBlock, 0)
+    if (blockCache.current.has(nextBlock.hash)) {
+      requestAnimationFrame(processNextBlock)
       return
     }
     
-    lastProcessedHash.current = nextBlock.hash
+    blockCache.current.add(nextBlock.hash)
 
     setItems(prevItems => {
-      if (prevItems.some(item => item.hash === nextBlock.hash)) {
-        return prevItems
-      }
-
       const newItems = [nextBlock, ...prevItems]
       
       if (prevItems.length >= MAX_ITEMS) {
         const itemToRemove = prevItems[prevItems.length - 1]
         setExitingItems(prev => [...prev, itemToRemove])
-        setTimeout(() => {
+        animationFrame.current = requestAnimationFrame(() => {
           setExitingItems(prev => prev.filter(item => item.hash !== itemToRemove.hash))
-        }, 0)
+        })
       }
       
       return newItems.slice(0, MAX_ITEMS)
     })
 
-    setTimeout(processNextBlock, 0)
+    // Process next block faster if we have more in queue
+    const delay = processingQueue.current.length > 5 ? 50 : 100;
+    setTimeout(() => requestAnimationFrame(processNextBlock), delay)
   }, [])
 
   useEffect(() => {
     let mounted = true
     
     const fetchItems = async () => {
-      if (!mounted || isProcessing.current) return
+      const now = Date.now()
+      if (!mounted || now - lastFetchTime.current < 100) return
+      
+      lastFetchTime.current = now
 
       try {
         const newItems = await fetchLatestBlocks()
         if (!mounted || newItems.length === 0) return
 
-        // Filter out blocks we already have
-        const existingHashes = new Set(items.map(item => item.hash))
-        const uniqueNewItems = newItems.filter(item => !existingHashes.has(item.hash))
+        const uniqueNewItems = newItems.filter(item => !blockCache.current.has(item.hash))
         
         if (uniqueNewItems.length > 0) {
           processingQueue.current = [...uniqueNewItems.reverse()]
-          processNextBlock()
-        }
+          requestAnimationFrame(processNextBlock)
 
-        // Fetch chain data for new items
-        uniqueNewItems.forEach(async (item) => {
-          if (!chainData[item.chainID]) {
-            const newChainData = await fetchChainData(item.chainID)
-            if (mounted && newChainData) {
-              setChainData(prev => ({ ...prev, [item.chainID]: newChainData }))
+          // Pre-fetch chain data in parallel
+          Promise.all(uniqueNewItems.map(async (item) => {
+            if (!chainData[item.chainID]) {
+              const newChainData = await fetchChainData(item.chainID)
+              if (mounted && newChainData) {
+                setChainData(prev => ({ ...prev, [item.chainID]: newChainData }))
+              }
             }
-          }
-        })
+          }))
+        }
       } catch (error) {
         console.error('Error fetching blocks:', error)
       }
     }
 
     fetchItems()
-    const interval = setInterval(fetchItems, 500) // Keeping slower refresh for blocks
+    const interval = setInterval(fetchItems, 200)
     
     return () => {
       mounted = false
       clearInterval(interval)
-    }
-  }, [chainData, processNextBlock])
-
-  useEffect(() => {
-    if (containerRef.current) {
-      const children = containerRef.current.children
-      for (let i = 0; i < children.length; i++) {
-        const child = children[i] as HTMLElement
-        child.style.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
-        child.style.opacity = '0'
-        child.style.transform = 'translateX(-20px)'
-        
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            child.style.opacity = '1'
-            child.style.transform = 'translateX(0)'
-          }, i * 80)
-        })
+      if (animationFrame.current) {
+        cancelAnimationFrame(animationFrame.current)
       }
     }
-  }, [items])
+  }, [chainData, processNextBlock])
 
   const formatHash = (hash: string) => {
     return `${hash.slice(0, 6)}...${hash.slice(-6)}`
@@ -126,13 +110,13 @@ export const BlockStream = () => {
     const currentChainData = chainData[block.chainID]
     return (
       <div 
-        key={block.hash}
+        key={isExiting ? `exiting-${block.hash}` : block.hash}
         className="flex items-center justify-between p-2 hover:bg-[rgba(232,65,66,0.2)] rounded-lg h-[60px] min-h-[60px]"
         style={{
           opacity: isExiting ? 0 : 1,
           transform: isExiting ? 'translateY(20px)' : 'translateY(0)',
-          transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          animation: isExiting ? 'none' : 'fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1), glow 3s infinite'
+          transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)', // Faster transition
+          animation: isExiting ? 'none' : 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1), glow 2s infinite'
         }}
       >
         <div className="flex items-center gap-2">
@@ -185,7 +169,7 @@ export const BlockStream = () => {
         @keyframes fadeIn {
           from {
             opacity: 0;
-            transform: translateY(-15px);
+            transform: translateY(-3px); // Smaller distance for faster animation
           }
           to {
             opacity: 1;
@@ -195,7 +179,7 @@ export const BlockStream = () => {
         
         @keyframes glow {
           0% { box-shadow: 0 0 0 0 rgba(232, 65, 66, 0.1); }
-          50% { box-shadow: 0 0 6px 1px rgba(232, 65, 66, 0.2); }
+          50% { box-shadow: 0 0 2px 1px rgba(232, 65, 66, 0.2); }
           100% { box-shadow: 0 0 0 0 rgba(232, 65, 66, 0.1); }
         }
       `}</style>
