@@ -8,7 +8,8 @@ function generateDummyBlock(): Block {
     timestamp: Date.now(),
     height: Math.floor(Math.random() * 1000000),
     chainID: chains[Math.floor(Math.random() * chains.length)],
-    txCount: Math.floor(Math.random() * 100)
+    txCount: Math.floor(Math.random() * 100),
+    value: Math.floor(Math.random() * 1000).toString()
   }
 }
 
