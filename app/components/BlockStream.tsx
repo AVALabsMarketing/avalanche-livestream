@@ -56,7 +56,7 @@ export const BlockStream = () => {
     
     const fetchItems = async () => {
       const now = Date.now()
-      if (!mounted || now - lastFetchTime.current < 100) return
+      if (!mounted || isProcessing.current || now - lastFetchTime.current < 500) return
       
       lastFetchTime.current = now
 
@@ -67,8 +67,11 @@ export const BlockStream = () => {
         const uniqueNewItems = newItems.filter(item => !blockCache.current.has(item.hash))
         
         if (uniqueNewItems.length > 0) {
-          processingQueue.current = [...uniqueNewItems.reverse()]
-          requestAnimationFrame(processNextBlock)
+          processingQueue.current = [...processingQueue.current, ...uniqueNewItems.reverse()]
+          
+          if (!isProcessing.current) {
+            requestAnimationFrame(processNextBlock)
+          }
 
           // Pre-fetch chain data in parallel
           Promise.all(uniqueNewItems.map(async (item) => {
@@ -86,7 +89,7 @@ export const BlockStream = () => {
     }
 
     fetchItems()
-    const interval = setInterval(fetchItems, 200)
+    const interval = setInterval(fetchItems, 1000)
     
     return () => {
       mounted = false
@@ -110,7 +113,7 @@ export const BlockStream = () => {
     const currentChainData = chainData[block.chainID]
     return (
       <div 
-        key={isExiting ? `exiting-${block.hash}` : block.hash}
+        key={isExiting ? `exiting-${block.hash}-${index}` : block.hash}
         className="flex items-center justify-between p-2 hover:bg-[rgba(232,65,66,0.2)] rounded-lg h-[60px] min-h-[60px]"
         style={{
           opacity: isExiting ? 0 : 1,
@@ -162,7 +165,9 @@ export const BlockStream = () => {
           className="h-full flex flex-col justify-start gap-1 p-2 relative"
         >
           {items.map((block, index) => renderBlock(block, index))}
-          {exitingItems.map((block, index) => renderBlock(block, index, true))}
+          {exitingItems
+            .filter(exitingBlock => !items.some(item => item.hash === exitingBlock.hash))
+            .map((block, index) => renderBlock(block, index, true))}
         </div>
       </div>
       <style jsx global>{`

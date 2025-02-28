@@ -7,7 +7,6 @@ import { formatUnits } from 'viem'
 
 export const TransactionStream = () => {
   const MAX_ITEMS = 20;
-  const BUFFER_SIZE = 50; // Pre-load more transactions
   const [items, setItems] = useState<Transaction[]>([])
   const [exitingItems, setExitingItems] = useState<Transaction[]>([])
   const [chainData, setChainData] = useState<{ [chainID: string]: ChainData }>({})
@@ -25,6 +24,8 @@ export const TransactionStream = () => {
     }
 
     isProcessing.current = true
+    
+    // Process one transaction at a time for smooth animation
     const nextTx = processingQueue.current.shift()!
     
     if (transactionCache.current.has(nextTx.hash)) {
@@ -39,27 +40,32 @@ export const TransactionStream = () => {
       
       if (prevItems.length >= MAX_ITEMS) {
         const itemToRemove = prevItems[prevItems.length - 1]
-        setExitingItems(prev => [...prev, itemToRemove])
-        animationFrame.current = requestAnimationFrame(() => {
-          setExitingItems(prev => prev.filter(item => item.hash !== itemToRemove.hash))
+        setExitingItems(prev => {
+          if (prev.some(item => item.hash === itemToRemove.hash)) {
+            return prev;
+          }
+          return [...prev, itemToRemove];
         })
+        
+        // Schedule cleanup of exiting items after animation completes
+        setTimeout(() => {
+          setExitingItems(prev => prev.filter(item => item.hash !== itemToRemove.hash))
+        }, 300)
       }
       
       return newItems.slice(0, MAX_ITEMS)
     })
 
-    // Process next transaction faster if we have more in queue
-    const delay = processingQueue.current.length > 5 ? 50 : 100;
-    setTimeout(() => requestAnimationFrame(processNextTransaction), delay)
+    // Process next transaction with a small delay for smooth animation
+    setTimeout(() => requestAnimationFrame(processNextTransaction), 100)
   }, [])
 
   useEffect(() => {
     let mounted = true
     
     const fetchItems = async () => {
-      // Prevent too frequent fetches
       const now = Date.now()
-      if (!mounted || isProcessing.current || now - lastFetchTime.current < 100) return
+      if (!mounted || now - lastFetchTime.current < 200) return
       
       lastFetchTime.current = now
 
@@ -70,24 +76,24 @@ export const TransactionStream = () => {
         const uniqueNewItems = newItems.filter(item => !transactionCache.current.has(item.hash))
         
         if (uniqueNewItems.length > 0) {
-          // If our queue is getting low, add more transactions
-          if (processingQueue.current.length < BUFFER_SIZE) {
-            processingQueue.current = [...processingQueue.current, ...uniqueNewItems.reverse()]
-            
-            if (!isProcessing.current) {
-              requestAnimationFrame(processNextTransaction)
-            }
+          processingQueue.current = [...processingQueue.current, ...uniqueNewItems.reverse()]
+          
+          if (!isProcessing.current) {
+            requestAnimationFrame(processNextTransaction)
           }
 
-          // Pre-fetch chain data
-          uniqueNewItems.forEach(async (item) => {
-            if (!chainData[item.chainID]) {
-              const newChainData = await fetchChainData(item.chainID)
-              if (mounted && newChainData) {
-                setChainData(prev => ({ ...prev, [item.chainID]: newChainData }))
-              }
+          // Batch chain data fetches for efficiency
+          const missingChainIds = uniqueNewItems
+            .map(item => item.chainID)
+            .filter(chainId => !chainData[chainId])
+            .filter((chainId, index, self) => self.indexOf(chainId) === index);
+          
+          Promise.all(missingChainIds.map(async (chainId) => {
+            const newChainData = await fetchChainData(chainId)
+            if (mounted && newChainData) {
+              setChainData(prev => ({ ...prev, [chainId]: newChainData }))
             }
-          })
+          }));
         }
       } catch (error) {
         console.error('Error fetching transactions:', error)
@@ -95,8 +101,7 @@ export const TransactionStream = () => {
     }
 
     fetchItems()
-    // More frequent polling
-    const interval = setInterval(fetchItems, 50)
+    const interval = setInterval(fetchItems, 400)
     
     return () => {
       mounted = false
@@ -141,8 +146,8 @@ export const TransactionStream = () => {
         style={{
           opacity: isExiting ? 0 : 1,
           transform: isExiting ? 'translateY(20px)' : 'translateY(0)',
-          transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          animation: isExiting ? 'none' : 'fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1), glow 3s infinite'
+          transition: 'all 0.2s ease-out',
+          animation: isExiting ? 'none' : 'fadeIn 0.25s ease-out, glow 3s infinite'
         }}
       >
         <div className="flex items-center gap-2">
@@ -188,14 +193,16 @@ export const TransactionStream = () => {
           className="h-full flex flex-col justify-start gap-1 p-2 relative"
         >
           {items.map((tx, index) => renderTransaction(tx, index))}
-          {exitingItems.map((tx, index) => renderTransaction(tx, index, true))}
+          {exitingItems
+            .filter(exitingTx => !items.some(item => item.hash === exitingTx.hash))
+            .map((tx, index) => renderTransaction(tx, index, true))}
         </div>
       </div>
       <style jsx global>{`
         @keyframes fadeIn {
           from {
             opacity: 0;
-            transform: translateY(-5px);
+            transform: translateY(-3px);
           }
           to {
             opacity: 1;

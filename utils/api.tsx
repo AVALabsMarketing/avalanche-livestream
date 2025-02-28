@@ -33,9 +33,25 @@ export interface ChainData {
   }
 }
 
+// Adding API key to all Glacier API requests
+const GLACIER_API_KEY = 'ac_MPe8jF1Xdt1oP5qfMvVfJXF8M-GOjwzBCcmMeHZKVhHwEzpJUbyJ6bp4GjfNkTrzOfwHwVIKL8bXp__2_isAow'; // I don't care, sorry not sorry
+const glacierAxios = axios.create({
+  headers: {
+    'x-glacier-api-key': GLACIER_API_KEY
+  }
+});
+
+// Cache object only for chain data
+const chainDataCache: Record<string, {
+  data: ChainData | null,
+  timestamp: number,
+  expiryTime: number,
+  notFound?: boolean // Add flag for 404 errors
+}> = {};
+
 export async function fetchLatestTransactions(): Promise<Transaction[]> {
   try {
-    const response = await axios.get('https://glacier-api.avax.network/v1/transactions')
+    const response = await glacierAxios.get('https://glacier-api.avax.network/v1/transactions')
     return response.data.transactions.map((item: any) => ({
       hash: item.txHash,
       timestamp: item.blockTimestamp * 1000, // Convert to milliseconds
@@ -52,7 +68,7 @@ export async function fetchLatestTransactions(): Promise<Transaction[]> {
 
 export async function fetchLatestBlocks(): Promise<Block[]> {
   try {  
-    const response = await axios.get('https://glacier-api.avax.network/v1/blocks');
+    const response = await glacierAxios.get('https://glacier-api.avax.network/v1/blocks');
     return response.data.blocks.map((item: any) => ({
       hash: item.blockHash,
       timestamp: item.blockTimestamp * 1000, // Convert to milliseconds
@@ -68,10 +84,31 @@ export async function fetchLatestBlocks(): Promise<Block[]> {
 }
 
 export async function fetchChainData(chainID: string): Promise<ChainData | null> {
+  // Initialize cache entry for this chainID if it doesn't exist
+  if (!chainDataCache[chainID]) {
+    chainDataCache[chainID] = {
+      data: null,
+      timestamp: 0,
+      expiryTime: 300000, // 5 minutes
+    };
+  }
+  
+  // If we've previously received a 404 for this chainID, don't try again
+  if (chainDataCache[chainID].notFound) {
+    return null;
+  }
+  
+  // Check if cache is valid
+  const now = Date.now();
+  if (chainDataCache[chainID].data && 
+      now - chainDataCache[chainID].timestamp < chainDataCache[chainID].expiryTime) {
+    return chainDataCache[chainID].data;
+  }
+  
   try {
-    const response = await axios.get(`https://glacier-api.avax.network/v1/chains/${chainID}`)
+    const response = await glacierAxios.get(`https://glacier-api.avax.network/v1/chains/${chainID}`)
     const data = response.data
-    return {
+    const chainData = {
       chainLogoUri: data.chainLogoUri,
       chainName: data.chainName,
       nativeToken: {
@@ -79,10 +116,24 @@ export async function fetchChainData(chainID: string): Promise<ChainData | null>
         name: data.networkToken.name,
         decimals: data.networkToken.decimals,
       }
-    }
+    };
+    
+    // Update cache
+    chainDataCache[chainID].data = chainData;
+    chainDataCache[chainID].timestamp = now;
+    
+    return chainData;
   } catch (error) {
-    console.error(`Error fetching chain data for chainID ${chainID}:`, error)
-    return null
+    console.error(`Error fetching chain data for chainID ${chainID}:`, error);
+    
+    // For 404 errors, mark as permanently not found
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      chainDataCache[chainID].notFound = true;
+      chainDataCache[chainID].data = null;
+    }
+    
+    // Return cached data if available, even if expired
+    return chainDataCache[chainID].data;
   }
 }
 

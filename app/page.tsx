@@ -45,14 +45,14 @@ export default function AvalancheVisualization() {
   return (
     <div className="fixed inset-0 flex flex-col bg-black text-white">
       {/* Stats Bar on Top */}
-      <div className="h-[100px] px-4 py-2">
+      <div className="h-[100px] px-4 pt-0 pb-2">
         <NetworkStats />
       </div>
       
       {/* Main Content */}
       <div className="flex-1 grid grid-cols-[350px_1fr_350px]">
         {/* Left Side - Transactions */}
-        <div className="p-4 overflow-hidden">
+        <div className="h-full overflow-hidden">
           <TransactionStream />
         </div>
         
@@ -64,7 +64,7 @@ export default function AvalancheVisualization() {
         </div>
         
         {/* Right Side - Blocks */}
-        <div className="p-4 overflow-hidden">
+        <div className="h-full overflow-hidden">
           <BlockStream />
         </div>
       </div>
