@@ -37,18 +37,24 @@ export const BlockStream = () => {
       
       if (prevItems.length >= MAX_ITEMS) {
         const itemToRemove = prevItems[prevItems.length - 1]
-        setExitingItems(prev => [...prev, itemToRemove])
-        animationFrame.current = requestAnimationFrame(() => {
-          setExitingItems(prev => prev.filter(item => item.hash !== itemToRemove.hash))
+        setExitingItems(prev => {
+          if (prev.some(item => item.hash === itemToRemove.hash)) {
+            return prev;
+          }
+          return [...prev, itemToRemove];
         })
+        
+        // Schedule cleanup of exiting items after animation completes
+        setTimeout(() => {
+          setExitingItems(prev => prev.filter(item => item.hash !== itemToRemove.hash))
+        }, 300)
       }
       
       return newItems.slice(0, MAX_ITEMS)
     })
 
-    // Process next block faster if we have more in queue
-    const delay = processingQueue.current.length > 5 ? 50 : 100;
-    setTimeout(() => requestAnimationFrame(processNextBlock), delay)
+    // Process next block with a small delay for smooth animation
+    setTimeout(() => requestAnimationFrame(processNextBlock), 100)
   }, [])
 
   useEffect(() => {
@@ -89,7 +95,7 @@ export const BlockStream = () => {
     }
 
     fetchItems()
-    const interval = setInterval(fetchItems, 1000)
+    const interval = setInterval(fetchItems, 400)
     
     return () => {
       mounted = false
@@ -113,13 +119,13 @@ export const BlockStream = () => {
     const currentChainData = chainData[block.chainID]
     return (
       <div 
-        key={isExiting ? `exiting-${block.hash}-${index}` : block.hash}
+        key={block.hash}
         className="flex items-center justify-between p-2 hover:bg-[rgba(232,65,66,0.2)] rounded-lg h-[60px] min-h-[60px]"
         style={{
           opacity: isExiting ? 0 : 1,
           transform: isExiting ? 'translateY(20px)' : 'translateY(0)',
-          transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)', // Faster transition
-          animation: isExiting ? 'none' : 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1), glow 2s infinite'
+          transition: 'all 0.2s ease-out',
+          animation: isExiting ? 'none' : 'fadeIn 0.25s ease-out, glow 3s infinite'
         }}
       >
         <div className="flex items-center gap-2">
